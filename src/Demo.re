@@ -18,6 +18,38 @@ module DemoProgram = {
     program: GL_extern.program,
     vertexPositionAttrib: GL_extern.attribLocation,
     vertexColorAttrib: GL_extern.attribLocation,
+    colorBuffer: GL_extern.buffer,
+  };
+
+  let uploadColors = (ctx, program, v) => {
+    open GL_extern;
+    let rec wrap = a => Js.Math.sin(a);
+
+    let colors = [|
+      wrap(v +. 1.0),
+      wrap(v +. 0.0),
+      wrap(v +. 0.0),
+      1.0,
+      wrap(v +. 0.0),
+      wrap(v +. 1.0),
+      wrap(v +. 0.0),
+      1.0,
+      wrap(v +. 0.0),
+      wrap(v +. 0.0),
+      wrap(v +. 1.0),
+      1.0,
+      wrap(v +. 1.0),
+      wrap(v +. 1.0),
+      wrap(v +. 0.0),
+      1.0,
+    |];
+    bindBuffer(ctx, c_ARRAY_BUFFER, program.colorBuffer);
+    bufferData(
+      ctx,
+      c_ARRAY_BUFFER,
+      Float32Array.make(colors),
+      c_STATIC_DRAW,
+    );
   };
 
   let make = ctx => {
@@ -26,24 +58,6 @@ module DemoProgram = {
     let positionBuffer = createBuffer(ctx);
     let colorBuffer = createBuffer(ctx);
     let positions = [|(-0.5), 0.5, 0.5, 0.5, (-0.5), (-0.5), 0.5, (-0.5)|];
-    let colors = [|
-      1.0,
-      0.0,
-      0.0,
-      1.0,
-      0.0,
-      1.0,
-      0.0,
-      1.0,
-      0.0,
-      0.0,
-      1.0,
-      1.0,
-      1.0,
-      1.0,
-      1.0,
-      1.0,
-    |];
 
     Belt.Result.map(
       program,
@@ -73,19 +87,20 @@ module DemoProgram = {
         );
         enableVertexAttribArray(ctx, vertexPositionAttrib);
 
+        let p = {
+          program,
+          vertexPositionAttrib,
+          vertexColorAttrib,
+          colorBuffer,
+        };
+
         /////// Color buffer ////////
-        bindBuffer(ctx, c_ARRAY_BUFFER, colorBuffer);
-        bufferData(
-          ctx,
-          c_ARRAY_BUFFER,
-          Float32Array.make(colors),
-          c_STATIC_DRAW,
-        );
+        uploadColors(ctx, p, 0.1);
 
         vertexAttribPointer(ctx, vertexColorAttrib, 4, c_FLOAT, false, 0, 0);
         enableVertexAttribArray(ctx, vertexColorAttrib);
 
-        {program, vertexPositionAttrib, vertexColorAttrib};
+        p;
       },
     );
   };
@@ -98,24 +113,37 @@ module DemoProgram = {
   };
 };
 
+type window;
+[@bs.val] external window: window = "window";
+[@bs.send]
+external requestAnimationFrame: (window, int => unit) => unit =
+  "requestAnimationFrame";
+
 let start = () => {
   open GL_extern;
   module Result = Belt.Result;
 
   let ctx = Canvas.getWebGLContext(Canvas.find());
-  clearColor(ctx, 0.0, 0.0, 0.0, 1.0);
-  clear(ctx, c_COLOR_BUFFER_BIT);
 
   let demoProgram = DemoProgram.make(ctx);
+  let clear = () => {
+    clearColor(ctx, 0.0, 0.0, 0.0, 1.0);
+    clear(ctx, c_COLOR_BUFFER_BIT);
+  };
+
   switch (demoProgram) {
   | Result.Error(err) => Js.log(err)
   | Result.Ok(program) =>
-    DemoProgram.draw(ctx, program);
-    DemoProgram.draw(ctx, program);
-    DemoProgram.draw(ctx, program);
-    DemoProgram.draw(ctx, program);
+    let col = ref(0.0);
+    let rec draw = _time => {
+      col := col^ +. 0.01;
+      clear();
+      DemoProgram.draw(ctx, program);
+      DemoProgram.uploadColors(ctx, program, col^);
+      requestAnimationFrame(window, draw);
+    };
+    draw(0);
   };
-  ();
 };
 
 let _ = start();
