@@ -13,41 +13,75 @@ module Canvas = {
 [@bs.module "./shader.vert"] external vertShaderSrc: string = "default";
 [@bs.module "./shader.frag"] external fragShaderSrc: string = "default";
 
+module DemoProgram = {
+  type t = {
+    program: GL_extern.program,
+    vertexPositionAttrib: GL_extern.attribLocation,
+    // vertexColorAttrib: GL_extern.attribLocation,
+  };
+
+  let make = ctx => {
+    open GL_extern;
+    let program = GL.makeProgram(ctx, vertShaderSrc, fragShaderSrc);
+    let positionBuffer = createBuffer(ctx);
+    let positions = [|(-0.5), 0.5, 0.5, 0.5, (-0.5), (-0.5), 0.5, (-0.5)|];
+
+    // let colors = [|1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0|];
+    // let colorAttrib = getAttribLocation(ctx, program, "aVertexPosition");
+
+    Belt.Result.map(
+      program,
+      program => {
+        let vertexPositionAttrib =
+          GL_extern.getAttribLocation(ctx, program, "aVertexPosition");
+        bindBuffer(ctx, c_ARRAY_BUFFER, positionBuffer);
+        bufferData(
+          ctx,
+          c_ARRAY_BUFFER,
+          Float32Array.make(positions),
+          c_STATIC_DRAW,
+        );
+
+        vertexAttribPointer(
+          ctx,
+          vertexPositionAttrib,
+          2,
+          c_FLOAT,
+          false,
+          0,
+          0,
+        );
+        enableVertexAttribArray(ctx, vertexPositionAttrib);
+
+        {
+          program,
+          vertexPositionAttrib,
+          // vertexColorAttrib,
+        };
+      },
+    );
+  };
+
+  let draw = (ctx, t) => {
+    open GL_extern;
+
+    useProgram(ctx, t.program);
+    drawArrays(ctx, c_TRIANGLE_STRIP, 0, 4);
+  };
+};
+
 let start = () => {
   open GL_extern;
-  open GL;
   module Result = Belt.Result;
 
   let ctx = Canvas.getWebGLContext(Canvas.find());
   clearColor(ctx, 0.0, 0.0, 0.0, 1.0);
   clear(ctx, c_COLOR_BUFFER_BIT);
 
-  let program = makeProgram(ctx, vertShaderSrc, fragShaderSrc);
-  switch (program) {
+  let demoProgram = DemoProgram.make(ctx);
+  switch (demoProgram) {
   | Result.Error(err) => Js.log(err)
-  | Result.Ok(program) =>
-    let positionBuffer = createBuffer(ctx);
-    let positions = [|(-0.5), 0.5, 0.5, 0.5, (-0.5), (-0.5), 0.5, (-0.5)|];
-    let colors = [|1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0|];
-    let vertexAttrib = getAttribLocation(ctx, program, "aVertexPosition");
-    let colorAttrib = getAttribLocation(ctx, program, "aVertexPosition");
-
-    bindBuffer(ctx, c_ARRAY_BUFFER, positionBuffer);
-    bufferData(
-      ctx,
-      c_ARRAY_BUFFER,
-      Float32Array.make(positions),
-      c_STATIC_DRAW,
-    );
-
-    bindBuffer(ctx, c_ARRAY_BUFFER, positionBuffer);
-    vertexAttribPointer(ctx, vertexAttrib, 2, c_FLOAT, false, 0, 0);
-    enableVertexAttribArray(ctx, vertexAttrib);
-
-    useProgram(ctx, program);
-
-    drawArrays(ctx, c_TRIANGLE_STRIP, 0, 4);
-    ();
+  | Result.Ok(program) => DemoProgram.draw(ctx, program)
   };
   ();
 };
