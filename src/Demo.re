@@ -17,23 +17,43 @@ module DemoProgram = {
   type t = {
     program: GL_extern.program,
     vertexPositionAttrib: GL_extern.attribLocation,
-    // vertexColorAttrib: GL_extern.attribLocation,
+    vertexColorAttrib: GL_extern.attribLocation,
   };
 
   let make = ctx => {
     open GL_extern;
     let program = GL.makeProgram(ctx, vertShaderSrc, fragShaderSrc);
     let positionBuffer = createBuffer(ctx);
+    let colorBuffer = createBuffer(ctx);
     let positions = [|(-0.5), 0.5, 0.5, 0.5, (-0.5), (-0.5), 0.5, (-0.5)|];
-
-    // let colors = [|1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0|];
-    // let colorAttrib = getAttribLocation(ctx, program, "aVertexPosition");
+    let colors = [|
+      1.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      1.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+    |];
 
     Belt.Result.map(
       program,
       program => {
         let vertexPositionAttrib =
-          GL_extern.getAttribLocation(ctx, program, "aVertexPosition");
+          getAttribLocation(ctx, program, "aVertexPosition");
+        let vertexColorAttrib =
+          getAttribLocation(ctx, program, "aVertexColor");
+
+        /////// Position Buffer //////
         bindBuffer(ctx, c_ARRAY_BUFFER, positionBuffer);
         bufferData(
           ctx,
@@ -53,11 +73,19 @@ module DemoProgram = {
         );
         enableVertexAttribArray(ctx, vertexPositionAttrib);
 
-        {
-          program,
-          vertexPositionAttrib,
-          // vertexColorAttrib,
-        };
+        /////// Color buffer ////////
+        bindBuffer(ctx, c_ARRAY_BUFFER, colorBuffer);
+        bufferData(
+          ctx,
+          c_ARRAY_BUFFER,
+          Float32Array.make(colors),
+          c_STATIC_DRAW,
+        );
+
+        vertexAttribPointer(ctx, vertexColorAttrib, 4, c_FLOAT, false, 0, 0);
+        enableVertexAttribArray(ctx, vertexColorAttrib);
+
+        {program, vertexPositionAttrib, vertexColorAttrib};
       },
     );
   };
@@ -81,7 +109,11 @@ let start = () => {
   let demoProgram = DemoProgram.make(ctx);
   switch (demoProgram) {
   | Result.Error(err) => Js.log(err)
-  | Result.Ok(program) => DemoProgram.draw(ctx, program)
+  | Result.Ok(program) =>
+    DemoProgram.draw(ctx, program);
+    DemoProgram.draw(ctx, program);
+    DemoProgram.draw(ctx, program);
+    DemoProgram.draw(ctx, program);
   };
   ();
 };
