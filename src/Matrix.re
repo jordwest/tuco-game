@@ -17,33 +17,70 @@ module M4 {
     0., 0., 0., 1.,
   |]);
 
-  let translate = (x, y, z) => make([|
+  let transpose = m => {
+    let t = Array.make_float(size);
+    Array.iteri((i, _) => {
+      let col = i / dimension;
+      let row = i mod dimension;
+      t[dimension * col + row] = m[dimension * row + col];
+    }, m);
+    t;
+  };
+
+  let mul = (a, b) => {
+    let c = Array.make_float(size);
+    Array.iteri((i, _) => {
+      let col = i / dimension;
+      let row = i mod dimension;
+      let v =  a[dimension * row + 0] *. b[dimension * 0 + col]
+            +. a[dimension * row + 1] *. b[dimension * 1 + col]
+            +. a[dimension * row + 2] *. b[dimension * 2 + col]
+            +. a[dimension * row + 3] *. b[dimension * 3 + col];
+      c[dimension * row + col] = v;
+    }, a);
+    c;
+  };
+
+  let eq = (a, b) => {
+    let rec eq_rec = i => {
+      switch (i) {
+        | i when i >= size => true
+        | i when a[i] != b[i] => false
+        | i => eq_rec(i + 1)
+      }
+    }
+    eq_rec(0);
+  };
+
+  let translation = (x, y, z) => make([|
     1., 0., 0., 0.,
     0., 1., 0., 0.,
     0., 0., 1., 0.,
     x,  y,  z,  1.,
   |]);
 
-  let translateX = x => make([|
+  let translationX = x => make([|
     1., 0., 0., 0.,
     0., 1., 0., 0.,
     0., 0., 1., 0.,
     x,  0., 0., 1.,
   |]);
 
-  let translateY = y => make([|
+  let translationY = y => make([|
     1., 0., 0., 0.,
     0., 1., 0., 0.,
     0., 0., 1., 0.,
     0., y,  0., 1.,
   |]);
 
-  let translateZ = z => make([|
+  let translationZ = z => make([|
     1., 0., 0., 0.,
     0., 1., 0., 0.,
     0., 0., 1., 0.,
     0., 0., z,  1.,
   |]);
+
+  let translate = (m, x, y, z) => mul(m, translation(x, y, z));
 
   let scale = (x, y, z) => make([|
     x,  0., 0., 0.,
@@ -106,39 +143,15 @@ module M4 {
     |]);
   };
 
-  let transpose = m => {
-    let t = Array.make_float(size);
-    Array.iteri((i, _) => {
-      let col = i / dimension;
-      let row = i mod dimension;
-      t[dimension * col + row] = m[dimension * row + col];
-    }, m);
-    t;
-  };
-
-  let mul = (a, b) => {
-    let c = Array.make_float(size);
-    Array.iteri((i, _) => {
-      let col = i / dimension;
-      let row = i mod dimension;
-      let v =  a[dimension * row + 0] *. b[dimension * 0 + col]
-            +. a[dimension * row + 1] *. b[dimension * 1 + col]
-            +. a[dimension * row + 2] *. b[dimension * 2 + col]
-            +. a[dimension * row + 3] *. b[dimension * 3 + col];
-      c[dimension * row + col] = v;
-    }, a);
-    c;
-  };
-
-  let eq = (a, b) => {
-    let rec eq_rec = i => {
-      switch (i) {
-        | i when i >= size => true
-        | i when a[i] != b[i] => false
-        | i => eq_rec(i + 1)
-      }
-    }
-    eq_rec(0);
+  let perspective(fovy, aspect, near, far) {
+    let f = 1. /. Js.Math.tan(fovy /. 2.);
+    let nf = 1. /. (near -. far);
+    make([|
+      f /. aspect, 0., 0., 0.,
+      0., f, 0., 0.,
+      0., 0., (far +. near) *. nf, -1.,
+      0., 0., 2. *. far *. near *. nf, 0.,
+    |]);
   };
 
   let print = (m: t) => {

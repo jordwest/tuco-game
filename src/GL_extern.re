@@ -1,5 +1,6 @@
 /** Raw bindings to WebGL functions */
 
+type canvas;
 type ctx;
 type shader;
 type program;
@@ -23,6 +24,11 @@ let c_TRIANGLE_STRIP: int = [%bs.raw {|5|}];
 let c_TRIANGLE_FAN: int = [%bs.raw {|6|}];
 let c_TRIANGLES: int = [%bs.raw {|4|}];
 
+[@bs.get] external getCanvas: ctx => canvas = "canvas";
+[@bs.get] external getClientWidth: canvas => float = "clientWidth";
+[@bs.get] external getClientHeight: canvas => float = "clientHeight";
+[@bs.send] external enable: (ctx, int) => unit = "enable";
+[@bs.send] external depthFunc: (ctx, int) => unit = "depthFunc";
 [@bs.send]
 external clearColor: (ctx, float, float, float, float) => unit = "clearColor";
 [@bs.send] external clear: (ctx, int) => unit = "clear";
@@ -63,3 +69,7 @@ external getUniformLocation: (ctx, program, string) => uniformLocation =
 external getAttribLocation: (ctx, program, string) => attribLocation =
   "getAttribLocation";
 [@bs.send] external clearDepth: (ctx, float) => unit = "clearDepth";
+[@bs.send]
+external uniformMatrix4fv:
+  (ctx, uniformLocation, bool, Js.TypedArray2.Float32Array.t) => unit =
+  "uniformMatrix4fv";

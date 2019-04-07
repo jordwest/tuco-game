@@ -1,8 +1,3 @@
-module Float32Array = {
-  type t;
-  [@bs.new] external make: Js.Array.t(float) => t = "Float32Array";
-};
-
 module Canvas = {
   type t;
   let find = (): t => [%bs.raw {|document.getElementById("canvas")|}];
@@ -18,12 +13,14 @@ module DemoProgram = {
     program: GL_extern.program,
     vertexPositionAttrib: GL_extern.attribLocation,
     vertexColorAttrib: GL_extern.attribLocation,
+    projectionMatrixLoc: GL_extern.uniformLocation,
+    modelViewMatrixLoc: GL_extern.uniformLocation,
     colorBuffer: GL_extern.buffer,
   };
 
   let uploadColors = (ctx, program, v) => {
     open GL_extern;
-    let rec wrap = a => Js.Math.sin(a);
+    let wrap = a => Js.Math.sin(a);
 
     let colors = [|
       wrap(v +. 1.0),
@@ -47,7 +44,7 @@ module DemoProgram = {
     bufferData(
       ctx,
       c_ARRAY_BUFFER,
-      Float32Array.make(colors),
+      Js.TypedArray2.Float32Array.make(colors),
       c_STATIC_DRAW,
     );
   };
@@ -57,22 +54,42 @@ module DemoProgram = {
     let program = GL.makeProgram(ctx, vertShaderSrc, fragShaderSrc);
     let positionBuffer = createBuffer(ctx);
     let colorBuffer = createBuffer(ctx);
-    let positions = [|(-0.5), 0.5, 0.5, 0.5, (-0.5), (-0.5), 0.5, (-0.5)|];
+    let positions = [|(-1.0), 1.0, 1.0, 1.0, (-1.0), (-1.0), 1.0, (-1.0)|];
 
     Belt.Result.map(
       program,
       program => {
+        clearColor(ctx, 0.0, 0.0, 0.0, 1.0);
+        clearDepth(ctx, 1.0);
+        enable(ctx, c_DEPTH_TEST);
+        depthFunc(ctx, c_LEQUAL);
+
+        clear(ctx, c_COLOR_BUFFER_BIT lor c_DEPTH_BUFFER_BIT);
+
+        /////// Camera ////////
+        let fov = 45. *. Js.Math._PI /. 180.;
+        let canvas = getCanvas(ctx);
+        let aspect = getClientWidth(canvas) /. getClientHeight(canvas);
+        let zNear = 0.1;
+        let zFar = 100.;
+        let projectionMatrix = Matrix.M4.perspective(fov, aspect, zNear, zFar);
+        let modelViewMatrix = Matrix.M4.translation(-0., 0., -6.);
+
         let vertexPositionAttrib =
           getAttribLocation(ctx, program, "aVertexPosition");
         let vertexColorAttrib =
           getAttribLocation(ctx, program, "aVertexColor");
+        let projectionMatrixLoc =
+          getUniformLocation(ctx, program, "uProjectionMatrix");
+        let modelViewMatrixLoc =
+          getUniformLocation(ctx, program, "uModelViewMatrix");
 
         /////// Position Buffer //////
         bindBuffer(ctx, c_ARRAY_BUFFER, positionBuffer);
         bufferData(
           ctx,
           c_ARRAY_BUFFER,
-          Float32Array.make(positions),
+          Js.TypedArray2.Float32Array.make(positions),
           c_STATIC_DRAW,
         );
 
@@ -91,6 +108,8 @@ module DemoProgram = {
           program,
           vertexPositionAttrib,
           vertexColorAttrib,
+          projectionMatrixLoc,
+          modelViewMatrixLoc,
           colorBuffer,
         };
 
@@ -100,15 +119,28 @@ module DemoProgram = {
         vertexAttribPointer(ctx, vertexColorAttrib, 4, c_FLOAT, false, 0, 0);
         enableVertexAttribArray(ctx, vertexColorAttrib);
 
+        useProgram(ctx, program);
+
+        uniformMatrix4fv(
+          ctx,
+          projectionMatrixLoc,
+          false,
+          Js.TypedArray2.Float32Array.make(projectionMatrix),
+        );
+        uniformMatrix4fv(
+          ctx,
+          modelViewMatrixLoc,
+          false,
+          Js.TypedArray2.Float32Array.make(modelViewMatrix)
+        );
+
         p;
       },
     );
   };
 
-  let draw = (ctx, t) => {
+  let draw = ctx => {
     open GL_extern;
-
-    useProgram(ctx, t.program);
     drawArrays(ctx, c_TRIANGLE_STRIP, 0, 4);
   };
 };
@@ -128,7 +160,7 @@ let start = () => {
   let demoProgram = DemoProgram.make(ctx);
   let clear = () => {
     clearColor(ctx, 0.0, 0.0, 0.0, 1.0);
-    clear(ctx, c_COLOR_BUFFER_BIT);
+    clear(ctx, c_COLOR_BUFFER_BIT lor c_DEPTH_BUFFER_BIT);
   };
 
   switch (demoProgram) {
@@ -138,7 +170,7 @@ let start = () => {
     let rec draw = _time => {
       col := col^ +. 0.01;
       clear();
-      DemoProgram.draw(ctx, program);
+      DemoProgram.draw(ctx);
       DemoProgram.uploadColors(ctx, program, col^);
       requestAnimationFrame(window, draw);
     };
