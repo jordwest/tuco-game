@@ -45,6 +45,13 @@ module M4 {
     c;
   };
 
+  // TODO: get rid of the first multiplication by identity
+  let mulList = l => {
+    List.fold_left((result, m) => {
+      mul(result, m);
+    }, (identity()), l);
+  };
+
   let eq = (a, b) => {
     let rec eq_rec = i => {
       switch (i) {

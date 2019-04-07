@@ -21,29 +21,24 @@ module DemoProgram = {
     projectionMatrixLoc: GL_extern.uniformLocation,
     modelViewMatrixLoc: GL_extern.uniformLocation,
     colorBuffer: GL_extern.buffer,
+    indexBuffer: GL_extern.buffer,
   };
 
   let uploadColors = (ctx, program, v) => {
     open GL_extern;
-    let wrap = a => Js.Math.sin(a);
-    let colors = [|
-      wrap(v +. 1.0),
-      wrap(v +. 0.0),
-      wrap(v +. 0.0),
-      1.0,
-      wrap(v +. 0.0),
-      wrap(v +. 1.0),
-      wrap(v +. 0.0),
-      1.0,
-      wrap(v +. 0.0),
-      wrap(v +. 0.0),
-      wrap(v +. 1.0),
-      1.0,
-      wrap(v +. 1.0),
-      wrap(v +. 1.0),
-      wrap(v +. 0.0),
-      1.0,
+    let faceColors = [|
+      [| 1.0, 1.0, 1.0, 1.0 |], // Front face: white
+      [| 1.0, 0.0, 0.0, 1.0 |], // Back face: red
+      [| 0.0, 1.0, 0.0, 1.0 |], // Top face: green
+      [| 0.0, 0.0, 1.0, 1.0 |], // Bottom face: blue
+      [| 1.0, 1.0, 0.0, 1.0 |], // Right face: yellow
+      [| 1.0, 0.0, 1.0, 1.0 |], // Left face: purple
     |];
+    let colors = Array.fold_left((colors, color) => {
+      // Repeat each color 4 times for each vertex of the face
+      Array.concat([colors, color, color, color, color])
+    }, [||], faceColors);
+
     bindBuffer(ctx, c_ARRAY_BUFFER, program.colorBuffer);
     bufferData(
       ctx,
@@ -57,8 +52,41 @@ module DemoProgram = {
     open GL_extern;
     let program = GL.makeProgram(ctx, vertShaderSrc, fragShaderSrc);
     let positionBuffer = createBuffer(ctx);
+    let indexBuffer = createBuffer(ctx);
     let colorBuffer = createBuffer(ctx);
-    let positions = [|(-1.0), 1.0, 1.0, 1.0, (-1.0), (-1.0), 1.0, (-1.0)|];
+    // let positions = [|(-1.0), 1.0, 1.0, 1.0, (-1.0), (-1.0), 1.0, (-1.0)|];
+    let positions = [|
+      // Front face
+      -1.0, -1.0, 1.0,
+       1.0, -1.0, 1.0,
+       1.0,  1.0, 1.0,
+      -1.0,  1.0, 1.0,
+      // Back face
+      -1.0, -1.0, -1.0,
+       1.0, -1.0, -1.0,
+       1.0,  1.0, -1.0,
+      -1.0,  1.0, -1.0,
+      // Top face
+      -1.0,  1.0, -1.0,
+      -1.0,  1.0,  1.0,
+       1.0,  1.0,  1.0,
+       1.0,  1.0, -1.0,
+      // Bottom face
+      -1.0, -1.0,  1.0,
+      -1.0, -1.0, -1.0,
+       1.0, -1.0, -1.0,
+       1.0, -1.0,  1.0,
+      // Right face
+       1.0, -1.0, -1.0,
+       1.0, -1.0,  1.0,
+       1.0,  1.0,  1.0,
+       1.0,  1.0, -1.0,
+      // Left face
+      -1.0, -1.0, -1.0,
+      -1.0, -1.0,  1.0,
+      -1.0,  1.0,  1.0,
+      -1.0,  1.0, -1.0,
+    |];
 
     Belt.Result.map(
       program,
@@ -99,17 +127,24 @@ module DemoProgram = {
           Js.TypedArray2.Float32Array.make(positions),
           c_STATIC_DRAW,
         );
-
-        vertexAttribPointer(
-          ctx,
-          vertexPositionAttrib,
-          2,
-          c_FLOAT,
-          false,
-          0,
-          0,
-        );
+        vertexAttribPointer(ctx, vertexPositionAttrib, 3, c_FLOAT, false, 0, 0);
         enableVertexAttribArray(ctx, vertexPositionAttrib);
+
+        bindBuffer(ctx, c_ELEMENT_ARRAY_BUFFER, indexBuffer);
+        let indices = [|
+          0, 1, 2,      0, 2, 3,    // front
+          4, 5, 6,      4, 6, 7,    // back
+          8, 9, 10,     8, 10, 11,  // top
+          12, 13, 14,   12, 14, 15, // bottom
+          16, 17, 18,   16, 18, 19, // right
+          20, 21, 22,   20, 22, 23, // left
+        |];
+        bufferData(
+          ctx,
+          c_ELEMENT_ARRAY_BUFFER,
+          Js.TypedArray2.Uint16Array.make(indices),
+          c_STATIC_DRAW,
+        );
 
         let p = {
           program,
@@ -121,11 +156,11 @@ module DemoProgram = {
           projectionMatrixLoc,
           modelViewMatrixLoc,
           colorBuffer,
+          indexBuffer,
         };
 
         /////// Color buffer ////////
         uploadColors(ctx, p, 0.1);
-
         vertexAttribPointer(ctx, vertexColorAttrib, 4, c_FLOAT, false, 0, 0);
         enableVertexAttribArray(ctx, vertexColorAttrib);
 
@@ -151,18 +186,24 @@ module DemoProgram = {
 
   let draw = (ctx, p) => {
     open GL_extern;
+
     let rotation = List.hd(p.elements).rotation^;
-    let modelViewMatrix = Matrix.M4.mul(
-      Matrix.M4.translation(0., 0., -6.),
+    let modelViewMatrix = Matrix.M4.mulList([
       Matrix.M4.rotateZ(rotation),
-    );
+      Matrix.M4.rotateY(rotation),
+      Matrix.M4.translation(0., 0., -6.),
+    ]);
     uniformMatrix4fv(
       ctx,
       p.modelViewMatrixLoc,
       false,
       Js.TypedArray2.Float32Array.make(modelViewMatrix),
     );
-    drawArrays(ctx, c_TRIANGLE_STRIP, 0, 4);
+
+    bindBuffer(ctx, c_ELEMENT_ARRAY_BUFFER, p.indexBuffer);
+    let vertexCount = 36;
+    let offset = 0;
+    drawElements(ctx, c_TRIANGLES, vertexCount, c_UNSIGNED_SHORT, offset);
   };
 };
 

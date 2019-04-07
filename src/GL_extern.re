@@ -10,7 +10,9 @@ type attribLocation;
 
 let c_TEXTURE_2D: int = [%bs.raw {|3553|}];
 let c_FLOAT: int = [%bs.raw {|5126|}];
+let c_UNSIGNED_SHORT: int = [%bs.raw {|5123|}];
 let c_ARRAY_BUFFER: int = [%bs.raw {|34962|}];
+let c_ELEMENT_ARRAY_BUFFER: int = [%bs.raw {|34963|}];
 let c_DEPTH_BUFFER_BIT: int = [%bs.raw {|256|}];
 let c_COLOR_BUFFER_BIT: int = [%bs.raw {|16384|}];
 let c_VERTEX_SHADER: int = [%bs.raw {|35633|}];
@@ -45,6 +47,7 @@ external enableVertexAttribArray: (ctx, attribLocation) => unit =
   "enableVertexAttribArray";
 [@bs.send] external bufferData: (ctx, int, 'a, int) => unit = "bufferData";
 [@bs.send] external drawArrays: (ctx, int, int, int) => unit = "drawArrays";
+[@bs.send] external drawElements: (ctx, int, int, int, int) => unit = "drawElements";
 [@bs.send]
 external shaderSource: (ctx, shader, string) => unit = "shaderSource";
 [@bs.send] external compileShader: (ctx, shader) => unit = "compileShader";
