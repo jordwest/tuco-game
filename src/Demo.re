@@ -8,7 +8,7 @@ module Canvas = {
 [@bs.module "./shader.vert"] external vertShaderSrc: string = "default";
 [@bs.module "./shader.frag"] external fragShaderSrc: string = "default";
 
-module DemoProgram = {
+module ShaderProgram = {
   type element = {
     rotation: ref(float),
   };
@@ -91,13 +91,6 @@ module DemoProgram = {
     Belt.Result.map(
       program,
       program => {
-        clearColor(ctx, 0.1, 0.35, 0.5, 0.7);
-        clearDepth(ctx, 1.0);
-        enable(ctx, c_DEPTH_TEST);
-        depthFunc(ctx, c_LEQUAL);
-
-        clear(ctx, c_COLOR_BUFFER_BIT lor c_DEPTH_BUFFER_BIT);
-
         /////// Camera ////////
         let fov = 45. *. Js.Math._PI /. 180.;
         let canvas = getCanvas(ctx);
@@ -207,37 +200,65 @@ module DemoProgram = {
   };
 };
 
-type window;
-[@bs.val] external window: window = "window";
-[@bs.send]
-external requestAnimationFrame: (window, int => unit) => unit =
-  "requestAnimationFrame";
+module Game = {
+  type state = {
+    ctx: GL_extern.ctx,
+    shader_program: ShaderProgram.t,
+  }
 
-let start = () => {
-  open GL_extern;
-  module Result = Belt.Result;
+  let make = (): Belt.Result.t(state, string) => {
+    let ctx = Canvas.getWebGLContext(Canvas.find());
+    let shader_program = ShaderProgram.make(ctx);
 
-  let ctx = Canvas.getWebGLContext(Canvas.find());
+    Belt.Result.map(shader_program, shader_program => {
+      {
+        ctx,
+        shader_program,
+      }
+    })
+  };
 
-  let demoProgram = DemoProgram.make(ctx);
-  let clear = () => {
+  /** Update the game state */
+  let update = (state: state, time: float) => {
+    ();
+  };
+
+  /** Draw everything */
+  let draw = (state: state, time: float) => {
+    open GL_extern;
+    let now = time *. 0.001;
+    let { ctx, shader_program } = state;
+
     clearColor(ctx, 0.1, 0.35, 0.5, 0.7);
     clearDepth(ctx, 1.0);
     clear(ctx, c_COLOR_BUFFER_BIT lor c_DEPTH_BUFFER_BIT);
-  };
+    enable(ctx, c_DEPTH_TEST);
+    depthFunc(ctx, c_LEQUAL);
 
-  switch (demoProgram) {
-  | Result.Error(err) => Js.log(err)
-  | Result.Ok(program) =>
-    let rec draw = _time => {
-      let now = float_of_int(_time) *. 0.001;
-      clear();
-      DemoProgram.draw(ctx, program);
-      DemoProgram.uploadColors(ctx, program, now);
-      List.hd(program.elements).rotation := Js.Math.sin(now);
-      requestAnimationFrame(window, draw);
+    ShaderProgram.draw(ctx, shader_program);
+    ShaderProgram.uploadColors(ctx, shader_program, now);
+    List.hd(shader_program.elements).rotation := Js.Math.sin(now);
+  };
+}
+
+type window;
+[@bs.val] external window: window = "window";
+[@bs.send]
+external requestAnimationFrame: (window, float => unit) => unit =
+  "requestAnimationFrame";
+
+let start = () => {
+  let game = Game.make();
+
+  switch (game) {
+  | Belt.Result.Error(err) => Js.log2("Error starting game", err)
+  | Belt.Result.Ok(game) =>
+    let rec tick = time => {
+      Game.update(game, time);
+      Game.draw(game, time);
+      requestAnimationFrame(window, tick);
     };
-    draw(0);
+    tick(0.0);
   };
 };
 
