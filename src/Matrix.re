@@ -1,3 +1,7 @@
+// Todo:
+// 1. Add an ability to mutate matrices (to avoid allocation of new ones)
+// 2. Use Float32Array instead of [||] to represent matrices to avoid a
+//    conversion when we pass a matrix into shader
 module M4 {
   type t = array(float);
   exception WrongInput;
