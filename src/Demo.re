@@ -163,13 +163,13 @@ module ShaderProgram = {
           ctx,
           projectionMatrixLoc,
           false,
-          Js.TypedArray2.Float32Array.make(projectionMatrix),
+          projectionMatrix,
         );
         uniformMatrix4fv(
           ctx,
           modelViewMatrixLoc,
           false,
-          Js.TypedArray2.Float32Array.make(modelViewMatrix),
+          modelViewMatrix,
         );
 
         p;
@@ -181,16 +181,15 @@ module ShaderProgram = {
     open GL_extern;
 
     let rotation = List.hd(p.elements).rotation^;
-    let modelViewMatrix = Matrix.M4.mulList([
-      Matrix.M4.rotateZ(rotation),
-      Matrix.M4.rotateY(rotation),
-      Matrix.M4.translation(0., 0., -6.),
-    ]);
+    let modelViewMatrix =
+      Matrix.M4.translation(0., 0., -6.)
+      |> Matrix.M4.mul(Matrix.M4.rotateZ(rotation))
+      |> Matrix.M4.mul(Matrix.M4.rotateY(rotation));
     uniformMatrix4fv(
       ctx,
       p.modelViewMatrixLoc,
       false,
-      Js.TypedArray2.Float32Array.make(modelViewMatrix),
+      modelViewMatrix,
     );
 
     bindBuffer(ctx, c_ELEMENT_ARRAY_BUFFER, p.indexBuffer);

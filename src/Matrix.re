@@ -3,15 +3,16 @@
 // 2. Use Float32Array instead of [||] to represent matrices to avoid a
 //    conversion when we pass a matrix into shader
 module M4 {
-  type t = array(float);
+  module F32Array = Js.TypedArray2.Float32Array;
+  type t = F32Array.t;
   exception WrongInput;
   let dimension = 4;
   let size = dimension * dimension;
 
-  let make = items => {
+  let make = (items: array(float)) => {
     Array.length(items) < size
       ? raise(WrongInput)
-      : items;
+      : F32Array.make(items);
   };
 
   let identity = _ => make([|
@@ -22,41 +23,38 @@ module M4 {
   |]);
 
   let transpose = m => {
-    let t = Array.make_float(size);
-    Array.iteri((i, _) => {
+    let result = F32Array.fromLength(size);
+    F32Array.forEachi(m, (. _, i) => {
       let col = i / dimension;
       let row = i mod dimension;
-      t[dimension * col + row] = m[dimension * row + col];
-    }, m);
-    t;
+      F32Array.unsafe_set(
+        result,
+        dimension * col + row,
+        F32Array.unsafe_get(m, dimension * row + col),
+      );
+    });
+    result;
   };
 
   let mul = (a, b) => {
-    let c = Array.make_float(size);
-    Array.iteri((i, _) => {
+    let result = F32Array.fromLength(size);
+    F32Array.forEachi(a, (. _, i) => {
       let col = i / dimension;
       let row = i mod dimension;
-      let v =  a[dimension * row + 0] *. b[dimension * 0 + col]
-            +. a[dimension * row + 1] *. b[dimension * 1 + col]
-            +. a[dimension * row + 2] *. b[dimension * 2 + col]
-            +. a[dimension * row + 3] *. b[dimension * 3 + col];
-      c[dimension * row + col] = v;
-    }, a);
-    c;
-  };
-
-  // TODO: get rid of the first multiplication by identity
-  let mulList = l => {
-    List.fold_left((result, m) => {
-      mul(result, m);
-    }, (identity()), l);
+      let v =  F32Array.unsafe_get(a, dimension * row + 0) *. F32Array.unsafe_get(b, dimension * 0 + col)
+            +. F32Array.unsafe_get(a, dimension * row + 1) *. F32Array.unsafe_get(b, dimension * 1 + col)
+            +. F32Array.unsafe_get(a, dimension * row + 2) *. F32Array.unsafe_get(b, dimension * 2 + col)
+            +. F32Array.unsafe_get(a, dimension * row + 3) *. F32Array.unsafe_get(b, dimension * 3 + col);
+      F32Array.unsafe_set(result, dimension * row + col, v);
+    });
+    result;
   };
 
   let eq = (a, b) => {
     let rec eq_rec = i => {
       switch (i) {
         | i when i >= size => true
-        | i when a[i] != b[i] => false
+        | i when F32Array.unsafe_get(a, i) != F32Array.unsafe_get(b, i) => false
         | i => eq_rec(i + 1)
       }
     }
@@ -168,16 +166,15 @@ module M4 {
 
   let print = (m: t) => {
     Js.log(
-      Js.Array.joinWith(
-        "",
-        Array.mapi((i, v) =>
-          Js.Float.toString(v) ++
+      Js.TypedArray2.Float32Array.reducei(
+        m,
+        (. result, v, i) =>
+          result ++ Js.Float.toString(v) ++
           ((i + 1) mod dimension == 0
             ? "\n"
             : "\t"),
-          m,
-        )
-      )
+        "",
+      ),
     );
   };
 
