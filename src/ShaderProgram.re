@@ -122,11 +122,7 @@ let make = ctx => {
     let zNear = 0.1;
     let zFar = 100.;
     let projectionMatrix = Matrix.M4.perspective(fov, aspect, zNear, zFar);
-    let modelViewMatrix = Matrix.M4.mul(
-      Matrix.M4.translation(0., 0., -6.),
-      Matrix.M4.rotateZ(0.),
-    );
-    // let modelViewMatrix = Matrix.M4.identity();
+    let modelViewMatrix = Matrix.M4.identity();
 
     let vertexPositionAttrib =
       getAttribLocation(ctx, program, "aVertexPosition");

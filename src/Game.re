@@ -1,9 +1,23 @@
 module Canvas = {
   type t;
+
   let find = (): t => [%bs.raw {|document.getElementById("canvas")|}];
   [@bs.send] external getContext: (t, string) => GL_extern.ctx = "getContext";
   let getWebGLContext = (t: t): GL_extern.ctx => getContext(t, "webgl");
+
+  [@bs.send] external requestPointerLock: (t) => unit = "requestPointerLock";
 };
+
+module Document {
+  type t;
+  type evt;
+
+  [@bs.send] external addEventListener: (t, string, (evt) => unit) => unit = "addEventListener";
+  [@bs.get] external getMovementX: evt => float = "movementX";
+  [@bs.get] external getMovementY: evt => float = "movementY";
+  [@bs.get] external getKey: evt => string = "key";
+}
+[@bs.val] external document: Document.t = "document";
 
 type window;
 [@bs.val] external window: window = "window";
@@ -18,15 +32,21 @@ module Game = {
     position: float,
   };
   type elements = list(element);
+  type key_state = {
+    w: ref(bool),
+    s: ref(bool),
+  };
 
   type state = {
     ctx: GL_extern.ctx,
     shader_program: ShaderProgram.t,
     elements: elements,
+    camera_pos: ref(Matrix.M4.t),
+    key_state: key_state,
   }
 
-  let make = (): Belt.Result.t(state, string) => {
-    let ctx = Canvas.getWebGLContext(Canvas.find());
+  let make = canvas: Belt.Result.t(state, string) => {
+    let ctx = Canvas.getWebGLContext(canvas);
     let shader_program = ShaderProgram.make(ctx);
 
     let elements = Array.make(100, ())
@@ -39,26 +59,32 @@ module Game = {
         ctx,
         shader_program,
         elements,
+        camera_pos: ref(Matrix.M4.identity() |> Matrix.M4.mul(Matrix.M4.translationZ(-5.0))),
+        key_state: {
+          w: ref(false),
+          s: ref(false),
+        }
       }
     })
   };
 
   /** Update the game state */
-  let update = (state: state, time: float) => {
+  let update = (state: state, time: float, dt: float) => {
     let now = time *. 0.001;
     List.iter(el => {
       el.rotation := Js.Math.sin(now);
 
-    }, state.elements);
+      let translateZ = 0.0
+        +. (state.key_state.w^ ? 0.00005 *. dt : 0.0)
+        +. (state.key_state.s^ ? -0.00005 *. dt : 0.0);
 
-    let cameraRotate = Js.Math.sin(now);
-    // let cameraRotate2 = Js.Math.cos(now);
-    let modelViewMatrix =
-      Matrix.M4.identity()
-      |> Matrix.M4.mul(Matrix.M4.translation(0., 0., -6.)) 
-      |> Matrix.M4.mul(Matrix.M4.rotateY(cameraRotate))
-      // |> Matrix.M4.mul(Matrix.M4.rotateX(cameraRotate2));
-    ShaderProgram.setModelViewMatrix(state.shader_program, modelViewMatrix);
+      state.camera_pos :=
+        Matrix.M4.identity()
+        |> Matrix.M4.mul(Matrix.M4.translationZ(translateZ))
+        |> Matrix.M4.mul(state.camera_pos^);
+      ShaderProgram.setModelViewMatrix(state.shader_program, state.camera_pos^);
+
+    }, state.elements);
   };
 
   /** Draw everything */
@@ -79,8 +105,6 @@ module Game = {
         |> Matrix.M4.mul(Matrix.M4.translation(el.position, 0., 0.))
         |> Matrix.M4.mul(Matrix.M4.rotateX(rotation *. float_of_int(i + 1) *. 0.1))
         |> Matrix.M4.mul(Matrix.M4.scale(el.scale, el.scale, el.scale));
-        // Matrix.M4.rotateZ(rotation)
-        // |> Matrix.M4.mul(Matrix.M4.translation(el.position, 0., 0.));
       ShaderProgram.setTransform(state.shader_program, transformMatrix);
 
       ShaderProgram.draw(ctx, shader_program);
@@ -89,13 +113,48 @@ module Game = {
   };
 
   let run = () => {
-    let game = make();
+    let canvas = Canvas.find();
+    let game = make(canvas);
+    let last_time = ref(0.0);
 
     switch (game) {
     | Belt.Result.Error(err) => Js.log2("Error starting game", err)
     | Belt.Result.Ok(game) =>
+      Document.addEventListener(document, "click", (_) => {
+        Canvas.requestPointerLock(canvas);
+      });
+
+      Document.addEventListener(document, "keydown", (e) => {
+        switch (Document.getKey(e)) {
+          | "w" => game.key_state.w := true
+          | "s" => game.key_state.s := true
+          | _ => ()
+        }
+      });
+
+      Document.addEventListener(document, "keyup", (e) => {
+        switch (Document.getKey(e)) {
+          | "w" => game.key_state.w := false
+          | "s" => game.key_state.s := false
+          | _ => ()
+        }
+      });
+
+      Document.addEventListener(document, "mousemove", (e) => {
+        let dx = Document.getMovementX(e);
+        let dy = Document.getMovementY(e);
+
+        game.camera_pos := Matrix.M4.identity()
+          |> Matrix.M4.mul(Matrix.M4.rotateY(dx *. -0.001))
+          |> Matrix.M4.mul(Matrix.M4.rotateX(dy *. -0.001))
+          |> Matrix.M4.mul(game.camera_pos^);
+        ShaderProgram.setModelViewMatrix(game.shader_program, game.camera_pos^);
+      });
+
       let rec tick = time => {
-        update(game, time);
+        let dt = time == 0.0 ? 0.0 : time -. last_time^;
+        last_time := time;
+        update(game, time, dt);
         draw(game);
         requestAnimationFrame(window, tick);
       };
