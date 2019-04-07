@@ -34,7 +34,9 @@ module Game = {
   type elements = list(element);
   type key_state = {
     w: ref(bool),
+    a: ref(bool),
     s: ref(bool),
+    d: ref(bool),
   };
 
   type state = {
@@ -62,7 +64,9 @@ module Game = {
         camera_pos: ref(Matrix.M4.identity() |> Matrix.M4.mul(Matrix.M4.translationZ(-5.0))),
         key_state: {
           w: ref(false),
+          a: ref(false),
           s: ref(false),
+          d: ref(false),
         }
       }
     })
@@ -74,13 +78,17 @@ module Game = {
     List.iter(el => {
       el.rotation := Js.Math.sin(now);
 
+      let translateX = 0.0
+        +. (state.key_state.a^ ? 0.00003 *. dt : 0.0)
+        +. (state.key_state.d^ ? -0.00003 *. dt : 0.0);
+
       let translateZ = 0.0
         +. (state.key_state.w^ ? 0.00005 *. dt : 0.0)
         +. (state.key_state.s^ ? -0.00005 *. dt : 0.0);
 
       state.camera_pos :=
         Matrix.M4.identity()
-        |> Matrix.M4.mul(Matrix.M4.translationZ(translateZ))
+        |> Matrix.M4.mul(Matrix.M4.translation(translateX, 0.0, translateZ))
         |> Matrix.M4.mul(state.camera_pos^);
       ShaderProgram.setModelViewMatrix(state.shader_program, state.camera_pos^);
 
@@ -127,7 +135,9 @@ module Game = {
       Document.addEventListener(document, "keydown", (e) => {
         switch (Document.getKey(e)) {
           | "w" => game.key_state.w := true
+          | "a" => game.key_state.a := true
           | "s" => game.key_state.s := true
+          | "d" => game.key_state.d := true
           | _ => ()
         }
       });
@@ -135,7 +145,9 @@ module Game = {
       Document.addEventListener(document, "keyup", (e) => {
         switch (Document.getKey(e)) {
           | "w" => game.key_state.w := false
+          | "a" => game.key_state.a := false
           | "s" => game.key_state.s := false
+          | "d" => game.key_state.d := false
           | _ => ()
         }
       });
