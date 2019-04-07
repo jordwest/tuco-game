@@ -8,6 +8,7 @@ type t = {
   vertexColorAttrib: GL_extern.attribLocation,
   projectionMatrixLoc: GL_extern.uniformLocation,
   modelViewMatrixLoc: GL_extern.uniformLocation,
+  transformLoc: GL_extern.uniformLocation,
   colorBuffer: GL_extern.buffer,
   indexBuffer: GL_extern.buffer,
 };
@@ -41,14 +42,24 @@ let uploadColors = (t) => {
   setVertexColor(t, Js.TypedArray2.Float32Array.make(colors));
 };
 
+let setTransform = (t, matrix) => {
+  GL_extern.useProgram(t.ctx, t.program);
+  GL_extern.uniformMatrix4fv(
+    t.ctx,
+    t.transformLoc,
+    false,
+    matrix,
+  );
+}
+
 let setProjectionMatrix = (t, matrix) => {
-GL_extern.useProgram(t.ctx, t.program);
-GL_extern.uniformMatrix4fv(
-  t.ctx,
-  t.projectionMatrixLoc,
-  false,
-  matrix,
-);
+  GL_extern.useProgram(t.ctx, t.program);
+  GL_extern.uniformMatrix4fv(
+    t.ctx,
+    t.projectionMatrixLoc,
+    false,
+    matrix,
+  );
 }
 
 let setModelViewMatrix = (t, matrix) => {
@@ -115,6 +126,7 @@ let make = ctx => {
       Matrix.M4.translation(0., 0., -6.),
       Matrix.M4.rotateZ(0.),
     );
+    // let modelViewMatrix = Matrix.M4.identity();
 
     let vertexPositionAttrib =
       getAttribLocation(ctx, program, "aVertexPosition");
@@ -124,6 +136,8 @@ let make = ctx => {
       getUniformLocation(ctx, program, "uProjectionMatrix");
     let modelViewMatrixLoc =
       getUniformLocation(ctx, program, "uModelViewMatrix");
+    let transformLoc =
+      getUniformLocation(ctx, program, "uTransform");
 
     /////// Position Buffer //////
     bindBuffer(ctx, c_ARRAY_BUFFER, positionBuffer);
@@ -159,6 +173,7 @@ let make = ctx => {
       vertexColorAttrib,
       projectionMatrixLoc,
       modelViewMatrixLoc,
+      transformLoc,
       colorBuffer,
       indexBuffer,
     };
@@ -173,6 +188,7 @@ let make = ctx => {
 
     setProjectionMatrix(p, projectionMatrix)
     setModelViewMatrix(p, modelViewMatrix)
+    setTransform(p, Matrix.M4.identity())
     p;
     },
   );

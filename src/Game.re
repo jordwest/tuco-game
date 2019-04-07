@@ -14,6 +14,8 @@ external requestAnimationFrame: (window, float => unit) => unit =
 module Game = {
   type element = {
     rotation: ref(float),
+    scale: float,
+    position: float,
   };
   type elements = list(element);
 
@@ -27,13 +29,16 @@ module Game = {
     let ctx = Canvas.getWebGLContext(Canvas.find());
     let shader_program = ShaderProgram.make(ctx);
 
+    let elements = Array.make(100, ())
+      |> Array.mapi((i, _) => {
+        {rotation: ref(0.), scale: 0.2, position: float_of_int(i - 50) *. 0.5}
+      })
+      |> Array.to_list;
     Belt.Result.map(shader_program, shader_program => {
       {
         ctx,
         shader_program,
-        elements: [
-          {rotation: ref(0.)},
-        ],
+        elements,
       }
     })
   };
@@ -41,13 +46,18 @@ module Game = {
   /** Update the game state */
   let update = (state: state, time: float) => {
     let now = time *. 0.001;
-    List.hd(state.elements).rotation := Js.Math.sin(now);
+    List.iter(el => {
+      el.rotation := Js.Math.sin(now);
 
-    let rotation = List.hd(state.elements).rotation^;
+    }, state.elements);
+
+    let cameraRotate = Js.Math.sin(now);
+    // let cameraRotate2 = Js.Math.cos(now);
     let modelViewMatrix =
-      Matrix.M4.translation(0., 0., -6.)
-      |> Matrix.M4.mul(Matrix.M4.rotateZ(rotation))
-      |> Matrix.M4.mul(Matrix.M4.rotateY(rotation));
+      Matrix.M4.identity()
+      |> Matrix.M4.mul(Matrix.M4.translation(0., 0., -6.)) 
+      |> Matrix.M4.mul(Matrix.M4.rotateY(cameraRotate))
+      // |> Matrix.M4.mul(Matrix.M4.rotateX(cameraRotate2));
     ShaderProgram.setModelViewMatrix(state.shader_program, modelViewMatrix);
   };
 
@@ -62,8 +72,20 @@ module Game = {
     enable(ctx, c_DEPTH_TEST);
     depthFunc(ctx, c_LEQUAL);
 
-    ShaderProgram.uploadColors(shader_program);
-    ShaderProgram.draw(ctx, shader_program);
+    List.iteri((i, el) => {
+      let rotation = el.rotation^;
+      let transformMatrix =
+        Matrix.M4.identity()
+        |> Matrix.M4.mul(Matrix.M4.translation(el.position, 0., 0.))
+        |> Matrix.M4.mul(Matrix.M4.rotateX(rotation *. float_of_int(i + 1) *. 0.1))
+        |> Matrix.M4.mul(Matrix.M4.scale(el.scale, el.scale, el.scale));
+        // Matrix.M4.rotateZ(rotation)
+        // |> Matrix.M4.mul(Matrix.M4.translation(el.position, 0., 0.));
+      ShaderProgram.setTransform(state.shader_program, transformMatrix);
+
+      ShaderProgram.draw(ctx, shader_program);
+    }, state.elements);
+
   };
 
   let run = () => {

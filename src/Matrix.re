@@ -15,7 +15,7 @@ module M4 {
       : F32Array.make(items);
   };
 
-  let identity = _ => make([|
+  let identity = () => make([|
     1., 0., 0., 0.,
     0., 1., 0., 0.,
     0., 0., 1., 0.,
