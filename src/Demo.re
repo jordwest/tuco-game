@@ -9,13 +9,9 @@ module Canvas = {
 [@bs.module "./shader.frag"] external fragShaderSrc: string = "default";
 
 module ShaderProgram = {
-  type element = {
-    rotation: ref(float),
-  };
-  type elements = list(element);
   type t = {
+    ctx: GL_extern.ctx,
     program: GL_extern.program,
-    elements: elements,
     vertexPositionAttrib: GL_extern.attribLocation,
     vertexColorAttrib: GL_extern.attribLocation,
     projectionMatrixLoc: GL_extern.uniformLocation,
@@ -24,8 +20,19 @@ module ShaderProgram = {
     indexBuffer: GL_extern.buffer,
   };
 
-  let uploadColors = (ctx, program, v) => {
+  let setVertexColor = (t, arr) => {
     open GL_extern;
+
+    bindBuffer(t.ctx, c_ARRAY_BUFFER, t.colorBuffer);
+    bufferData(
+      t.ctx,
+      c_ARRAY_BUFFER,
+      arr,
+      c_STATIC_DRAW,
+    );
+  }
+
+  let uploadColors = (t) => {
     let faceColors = [|
       [| 1.0, 1.0, 1.0, 1.0 |], // Front face: white
       [| 1.0, 0.0, 0.0, 1.0 |], // Back face: red
@@ -39,14 +46,28 @@ module ShaderProgram = {
       Array.concat([colors, color, color, color, color])
     }, [||], faceColors);
 
-    bindBuffer(ctx, c_ARRAY_BUFFER, program.colorBuffer);
-    bufferData(
-      ctx,
-      c_ARRAY_BUFFER,
-      Js.TypedArray2.Float32Array.make(colors),
-      c_STATIC_DRAW,
-    );
+    setVertexColor(t, Js.TypedArray2.Float32Array.make(colors));
   };
+
+  let setProjectionMatrix = (t, matrix) => {
+    GL_extern.useProgram(t.ctx, t.program);
+    GL_extern.uniformMatrix4fv(
+      t.ctx,
+      t.projectionMatrixLoc,
+      false,
+      matrix,
+    );
+  }
+
+  let setModelViewMatrix = (t, matrix) => {
+    GL_extern.useProgram(t.ctx, t.program);
+    GL_extern.uniformMatrix4fv(
+      t.ctx,
+      t.modelViewMatrixLoc,
+      false,
+      matrix,
+    );
+  }
 
   let make = ctx => {
     open GL_extern;
@@ -140,10 +161,8 @@ module ShaderProgram = {
         );
 
         let p = {
+          ctx,
           program,
-          elements: [
-            {rotation: ref(0.)},
-          ],
           vertexPositionAttrib,
           vertexColorAttrib,
           projectionMatrixLoc,
@@ -153,25 +172,15 @@ module ShaderProgram = {
         };
 
         /////// Color buffer ////////
-        uploadColors(ctx, p, 0.1);
+        uploadColors(p);
+        bindBuffer(ctx, c_ARRAY_BUFFER, colorBuffer);
         vertexAttribPointer(ctx, vertexColorAttrib, 4, c_FLOAT, false, 0, 0);
         enableVertexAttribArray(ctx, vertexColorAttrib);
 
         useProgram(ctx, program);
 
-        uniformMatrix4fv(
-          ctx,
-          projectionMatrixLoc,
-          false,
-          projectionMatrix,
-        );
-        uniformMatrix4fv(
-          ctx,
-          modelViewMatrixLoc,
-          false,
-          modelViewMatrix,
-        );
-
+        setProjectionMatrix(p, projectionMatrix)
+        setModelViewMatrix(p, modelViewMatrix)
         p;
       },
     );
@@ -179,18 +188,6 @@ module ShaderProgram = {
 
   let draw = (ctx, p) => {
     open GL_extern;
-
-    let rotation = List.hd(p.elements).rotation^;
-    let modelViewMatrix =
-      Matrix.M4.translation(0., 0., -6.)
-      |> Matrix.M4.mul(Matrix.M4.rotateZ(rotation))
-      |> Matrix.M4.mul(Matrix.M4.rotateY(rotation));
-    uniformMatrix4fv(
-      ctx,
-      p.modelViewMatrixLoc,
-      false,
-      modelViewMatrix,
-    );
 
     bindBuffer(ctx, c_ELEMENT_ARRAY_BUFFER, p.indexBuffer);
     let vertexCount = 36;
@@ -200,9 +197,15 @@ module ShaderProgram = {
 };
 
 module Game = {
+  type element = {
+    rotation: ref(float),
+  };
+  type elements = list(element);
+
   type state = {
     ctx: GL_extern.ctx,
     shader_program: ShaderProgram.t,
+    elements: elements,
   }
 
   let make = (): Belt.Result.t(state, string) => {
@@ -213,6 +216,9 @@ module Game = {
       {
         ctx,
         shader_program,
+        elements: [
+          {rotation: ref(0.)},
+        ],
       }
     })
   };
@@ -234,9 +240,16 @@ module Game = {
     enable(ctx, c_DEPTH_TEST);
     depthFunc(ctx, c_LEQUAL);
 
+    let rotation = List.hd(state.elements).rotation^;
+    let modelViewMatrix =
+      Matrix.M4.translation(0., 0., -6.)
+      |> Matrix.M4.mul(Matrix.M4.rotateZ(rotation))
+      |> Matrix.M4.mul(Matrix.M4.rotateY(rotation));
+    ShaderProgram.setModelViewMatrix(state.shader_program, modelViewMatrix);
+
     ShaderProgram.draw(ctx, shader_program);
-    ShaderProgram.uploadColors(ctx, shader_program, now);
-    List.hd(shader_program.elements).rotation := Js.Math.sin(now);
+    ShaderProgram.uploadColors(shader_program);
+    List.hd(state.elements).rotation := Js.Math.sin(now);
   };
 }
 
