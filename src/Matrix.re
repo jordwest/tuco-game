@@ -147,6 +147,7 @@ module M4 {
     |]);
   };
 
+  // Perspective explaind https://www.youtube.com/watch?v=mpTl003EXCY
   let perspective(fovy, aspect, near, far) {
     let f = 1. /. Js.Math.tan(fovy /. 2.);
     let nf = 1. /. (near -. far);

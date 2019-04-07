@@ -9,8 +9,13 @@ module Canvas = {
 [@bs.module "./shader.frag"] external fragShaderSrc: string = "default";
 
 module DemoProgram = {
+  type element = {
+    rotation: ref(float),
+  };
+  type elements = list(element);
   type t = {
     program: GL_extern.program,
+    elements: elements,
     vertexPositionAttrib: GL_extern.attribLocation,
     vertexColorAttrib: GL_extern.attribLocation,
     projectionMatrixLoc: GL_extern.uniformLocation,
@@ -21,7 +26,6 @@ module DemoProgram = {
   let uploadColors = (ctx, program, v) => {
     open GL_extern;
     let wrap = a => Js.Math.sin(a);
-
     let colors = [|
       wrap(v +. 1.0),
       wrap(v +. 0.0),
@@ -59,7 +63,7 @@ module DemoProgram = {
     Belt.Result.map(
       program,
       program => {
-        clearColor(ctx, 0.0, 0.0, 0.0, 1.0);
+        clearColor(ctx, 0.1, 0.35, 0.5, 0.7);
         clearDepth(ctx, 1.0);
         enable(ctx, c_DEPTH_TEST);
         depthFunc(ctx, c_LEQUAL);
@@ -73,7 +77,10 @@ module DemoProgram = {
         let zNear = 0.1;
         let zFar = 100.;
         let projectionMatrix = Matrix.M4.perspective(fov, aspect, zNear, zFar);
-        let modelViewMatrix = Matrix.M4.translation(-0., 0., -6.);
+        let modelViewMatrix = Matrix.M4.mul(
+          Matrix.M4.translation(0., 0., -6.),
+          Matrix.M4.rotateZ(0.),
+        );
 
         let vertexPositionAttrib =
           getAttribLocation(ctx, program, "aVertexPosition");
@@ -106,6 +113,9 @@ module DemoProgram = {
 
         let p = {
           program,
+          elements: [
+            {rotation: ref(0.)},
+          ],
           vertexPositionAttrib,
           vertexColorAttrib,
           projectionMatrixLoc,
@@ -131,7 +141,7 @@ module DemoProgram = {
           ctx,
           modelViewMatrixLoc,
           false,
-          Js.TypedArray2.Float32Array.make(modelViewMatrix)
+          Js.TypedArray2.Float32Array.make(modelViewMatrix),
         );
 
         p;
@@ -139,8 +149,19 @@ module DemoProgram = {
     );
   };
 
-  let draw = ctx => {
+  let draw = (ctx, p) => {
     open GL_extern;
+    let rotation = List.hd(p.elements).rotation^;
+    let modelViewMatrix = Matrix.M4.mul(
+      Matrix.M4.translation(0., 0., -6.),
+      Matrix.M4.rotateZ(rotation),
+    );
+    uniformMatrix4fv(
+      ctx,
+      p.modelViewMatrixLoc,
+      false,
+      Js.TypedArray2.Float32Array.make(modelViewMatrix),
+    );
     drawArrays(ctx, c_TRIANGLE_STRIP, 0, 4);
   };
 };
@@ -159,19 +180,20 @@ let start = () => {
 
   let demoProgram = DemoProgram.make(ctx);
   let clear = () => {
-    clearColor(ctx, 0.0, 0.0, 0.0, 1.0);
+    clearColor(ctx, 0.1, 0.35, 0.5, 0.7);
+    clearDepth(ctx, 1.0);
     clear(ctx, c_COLOR_BUFFER_BIT lor c_DEPTH_BUFFER_BIT);
   };
 
   switch (demoProgram) {
   | Result.Error(err) => Js.log(err)
   | Result.Ok(program) =>
-    let col = ref(0.0);
     let rec draw = _time => {
-      col := col^ +. 0.01;
+      let now = float_of_int(_time) *. 0.001;
       clear();
-      DemoProgram.draw(ctx);
-      DemoProgram.uploadColors(ctx, program, col^);
+      DemoProgram.draw(ctx, program);
+      DemoProgram.uploadColors(ctx, program, now);
+      List.hd(program.elements).rotation := Js.Math.sin(now);
       requestAnimationFrame(window, draw);
     };
     draw(0);
