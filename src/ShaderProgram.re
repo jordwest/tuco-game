@@ -27,12 +27,12 @@ let setVertexColor = (t, arr) => {
 
 let uploadColors = (t) => {
   let faceColors = [|
-    [| 1.0, 1.0, 1.0, 1.0 |], // Front face: white
-    [| 1.0, 0.0, 0.0, 1.0 |], // Back face: red
-    [| 0.0, 1.0, 0.0, 1.0 |], // Top face: green
-    [| 0.0, 0.0, 1.0, 1.0 |], // Bottom face: blue
-    [| 1.0, 1.0, 0.0, 1.0 |], // Right face: yellow
-    [| 1.0, 0.0, 1.0, 1.0 |], // Left face: purple
+    [| 1.0, 0.75, 0.0, 1.0 |],    // Front face: orange
+    [| 0.95, 0.26, 0.21, 1.0 |],  // Back face: yellow
+    [| 1.0, 0.84, 0.0, 1.0 |],    // Top face: yellow
+    [| 0.54, 0.76, 0.29, 1.0 |],  // Bottom face: green
+    [| 0.13, 0.58, 0.95, 1.0 |],  // Right face: blue
+    [| 1.0, 0.0, 1.0, 1.0 |],     // Left face: purple
   |];
   let colors = Array.fold_left((colors, color) => {
     // Repeat each color 4 times for each vertex of the face
