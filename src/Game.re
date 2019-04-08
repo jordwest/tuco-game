@@ -26,10 +26,11 @@ external requestAnimationFrame: (window, float => unit) => unit =
   "requestAnimationFrame";
 
 module Game = {
+  type point = (float, float, float);
   type element = {
     rotation: ref(float),
     scale: float,
-    position: float,
+    position: point,
   };
   type elements = list(element);
   type key_state = {
@@ -53,7 +54,9 @@ module Game = {
 
     let elements = Array.make(100, ())
       |> Array.mapi((i, _) => {
-        {rotation: ref(0.), scale: 0.2, position: float_of_int(i - 50) *. 0.5}
+        let x = float_of_int(i / 2 - 50) *. 0.5;
+        let y = i mod 2 == 0 ? 0. : 1.;
+        {rotation: ref(0.), scale: 0.2, position: (x, y, 0.)}
       })
       |> Array.to_list;
     Belt.Result.map(shader_program, shader_program => {
@@ -107,9 +110,10 @@ module Game = {
 
     List.iteri((i, el) => {
       let rotation = el.rotation^;
+      let (x, y, z) = el.position;
       let transformMatrix =
         Matrix.M4.identity()
-        |> Matrix.M4.mul(Matrix.M4.translation(el.position, 0., 0.))
+        |> Matrix.M4.mul(Matrix.M4.translation(x, y, z))
         |> Matrix.M4.mul(Matrix.M4.rotateX(rotation *. float_of_int(i + 1) *. 0.1))
         |> Matrix.M4.mul(Matrix.M4.scale(el.scale, el.scale, el.scale));
       ShaderProgram.setTransform(state.shader_program, transformMatrix);
