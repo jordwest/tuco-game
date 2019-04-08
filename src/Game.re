@@ -77,22 +77,21 @@ module Game = {
     let now = time *. 0.001;
     List.iter(el => {
       el.rotation := Js.Math.sin(now);
-
-      let translateX = 0.0
-        +. (state.key_state.a^ ? 0.00003 *. dt : 0.0)
-        +. (state.key_state.d^ ? -0.00003 *. dt : 0.0);
-
-      let translateZ = 0.0
-        +. (state.key_state.w^ ? 0.00005 *. dt : 0.0)
-        +. (state.key_state.s^ ? -0.00005 *. dt : 0.0);
-
-      state.camera_pos :=
-        Matrix.M4.identity()
-        |> Matrix.M4.mul(Matrix.M4.translation(translateX, 0.0, translateZ))
-        |> Matrix.M4.mul(state.camera_pos^);
-      ShaderProgram.setModelViewMatrix(state.shader_program, state.camera_pos^);
-
     }, state.elements);
+
+    let translateX = 0.0
+      +. (state.key_state.a^ ? 0.003 *. dt : 0.0)
+      +. (state.key_state.d^ ? -0.003 *. dt : 0.0);
+
+    let translateZ = 0.0
+      +. (state.key_state.w^ ? 0.005 *. dt : 0.0)
+      +. (state.key_state.s^ ? -0.005 *. dt : 0.0);
+
+    state.camera_pos :=
+      Matrix.M4.identity()
+      |> Matrix.M4.mul(Matrix.M4.translation(translateX, 0.0, translateZ))
+      |> Matrix.M4.mul(state.camera_pos^);
+    ShaderProgram.setModelViewMatrix(state.shader_program, state.camera_pos^);
   };
 
   /** Draw everything */
