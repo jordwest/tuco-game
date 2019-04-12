@@ -5,6 +5,7 @@ type ctx;
 type shader;
 type program;
 type buffer;
+type texture;
 type uniformLocation;
 type attribLocation;
 
@@ -25,6 +26,15 @@ let c_STATIC_DRAW: int = [%bs.raw {|35044|}];
 let c_TRIANGLE_STRIP: int = [%bs.raw {|5|}];
 let c_TRIANGLE_FAN: int = [%bs.raw {|6|}];
 let c_TRIANGLES: int = [%bs.raw {|4|}];
+
+let c_RGBA: int = [%bs.raw {|6408|}];
+let c_UNSIGNED_BYTE: int = [%bs.raw {|5121|}];
+let c_TEXTURE_WRAP_S: int = [%bs.raw {|10242|}];
+let c_TEXTURE_WRAP_T: int = [%bs.raw {|10243|}];
+let c_CLAMP_TO_EDGE: int = [%bs.raw {|33071|}];
+let c_TEXTURE_MIN_FILTER: int = [%bs.raw {|10241|}];
+let c_LINEAR: int = [%bs.raw {|9729|}];
+let c_TEXTURE0: int = [%bs.raw {|33984|}];
 
 [@bs.get] external getCanvas: ctx => canvas = "canvas";
 [@bs.get] external getClientWidth: canvas => float = "clientWidth";
@@ -76,3 +86,17 @@ external getAttribLocation: (ctx, program, string) => attribLocation =
 external uniformMatrix4fv:
   (ctx, uniformLocation, bool, Js.TypedArray2.Float32Array.t) => unit =
   "uniformMatrix4fv";
+[@bs.send] external createTexture: (ctx) => texture = "createTexture";
+[@bs.send] external bindTexture: (ctx, int, texture) => unit = "bindTexture";
+[@bs.send] external texParameteri: (ctx, int, int, int) => unit = "texParameteri";
+[@bs.send] external generateMipmap: (ctx, int) => unit = "";
+
+module Image = {
+  type t;
+  [@bs.new] external make: unit => t = "Image";
+  [@bs.set] external setOnload: (t, (unit => unit)) => unit = "onload";
+  [@bs.set] external setSrc: (t, string) => unit = "src";
+}
+
+[@bs.send] external texImage2D_u8: (ctx, int, int, int, int, int, int, int, int, Js.TypedArray2.Uint8Array.t) => unit = "";
+[@bs.send] external texImage2D_image: (ctx, int, int, int, int, int, Image.t) => unit = "";
