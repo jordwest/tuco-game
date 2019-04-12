@@ -30,7 +30,7 @@ module Game = {
   type element = {
     rotation: ref(float),
     scale: float,
-    position: point,
+    position: ref(point),
   };
   type elements = list(element);
   type key_state = {
@@ -52,11 +52,19 @@ module Game = {
     let ctx = Canvas.getWebGLContext(canvas);
     let shader_program = ShaderProgram.make(ctx);
 
-    let elements = Array.make(100, ())
+    let elements = Array.make(200, ())
       |> Array.mapi((i, _) => {
-        let x = float_of_int(i / 2 - 50) *. 0.5;
-        let y = i mod 2 == 0 ? 0. : 1.;
-        {rotation: ref(0.), scale: 0.2, position: (x, y, 0.)}
+        let rotation = float_of_int(i) *. 0.1;
+        let x = float_of_int(i / 5) *. 1.0;
+        let (y, z, scale) = switch (i mod 5) {
+          | 0 => (1.0, 1.0, 0.2)
+          | 1 => (0.5, 0.5, 0.1)
+          | 2 => (0.0, 0.0, 0.1)
+          | 3 => (-0.5, -0.5, 0.1)
+          | 4 => (-1.0, -1.0, 0.2)
+          | _ => (1.0, 1.0, 0.2)
+        };
+        {rotation: ref(rotation), scale: scale, position: ref((x, y, z))}
       })
       |> Array.to_list;
     Belt.Result.map(shader_program, shader_program => {
@@ -78,21 +86,21 @@ module Game = {
   /** Update the game state */
   let update = (state: state, time: float, dt: float) => {
     let now = time *. 0.001;
-    List.iter(el => {
-      el.rotation := Js.Math.sin(now);
+    List.iteri((i, el) => {
+      el.rotation := mod_float(el.rotation^ +. dt *. 0.001, Js.Math._PI *. 2.);
     }, state.elements);
 
-    let translateX = 0.0
-      +. (state.key_state.a^ ? 0.003 *. dt : 0.0)
-      +. (state.key_state.d^ ? -0.003 *. dt : 0.0);
+    let cameraMoveX = 0.0
+      +. (state.key_state.a^ ? 0.006 *. dt : 0.0)
+      +. (state.key_state.d^ ? -0.006 *. dt : 0.0);
 
-    let translateZ = 0.0
-      +. (state.key_state.w^ ? 0.005 *. dt : 0.0)
-      +. (state.key_state.s^ ? -0.005 *. dt : 0.0);
+    let cameraMoveZ = 0.0
+      +. (state.key_state.w^ ? 0.01 *. dt : 0.0)
+      +. (state.key_state.s^ ? -0.01 *. dt : 0.0);
 
     state.camera_pos :=
       Matrix.M4.identity()
-      |> Matrix.M4.mul(Matrix.M4.translation(translateX, 0.0, translateZ))
+      |> Matrix.M4.mul(Matrix.M4.translation(cameraMoveX, 0.0, cameraMoveZ))
       |> Matrix.M4.mul(state.camera_pos^);
     ShaderProgram.setModelViewMatrix(state.shader_program, state.camera_pos^);
   };
@@ -110,11 +118,11 @@ module Game = {
 
     List.iteri((i, el) => {
       let rotation = el.rotation^;
-      let (x, y, z) = el.position;
+      let (x, y, z) = el.position^;
       let transformMatrix =
         Matrix.M4.identity()
+        |> Matrix.M4.mul(Matrix.M4.rotateX(rotation))
         |> Matrix.M4.mul(Matrix.M4.translation(x, y, z))
-        |> Matrix.M4.mul(Matrix.M4.rotateX(rotation *. float_of_int(i + 1) *. 0.1))
         |> Matrix.M4.mul(Matrix.M4.scale(el.scale, el.scale, el.scale));
       ShaderProgram.setTransform(state.shader_program, transformMatrix);
 
