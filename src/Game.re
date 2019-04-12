@@ -25,6 +25,7 @@ type window;
 external requestAnimationFrame: (window, float => unit) => unit =
   "requestAnimationFrame";
 
+exception Unreachable;
 module Game = {
   type point = (float, float, float);
   type element = {
@@ -54,15 +55,15 @@ module Game = {
 
     let elements = Array.make(200, ())
       |> Array.mapi((i, _) => {
-        let rotation = float_of_int(i) *. 0.1;
-        let x = float_of_int(i / 5) *. 1.0;
+        let rotation = float_of_int(i / 5) *. 0.5;
+        let x = float_of_int(i / 5);
         let (y, z, scale) = switch (i mod 5) {
           | 0 => (1.0, 1.0, 0.2)
           | 1 => (0.5, 0.5, 0.1)
           | 2 => (0.0, 0.0, 0.1)
           | 3 => (-0.5, -0.5, 0.1)
           | 4 => (-1.0, -1.0, 0.2)
-          | _ => (1.0, 1.0, 0.2)
+          | _ => raise(Unreachable)
         };
         {rotation: ref(rotation), scale: scale, position: ref((x, y, z))}
       })
